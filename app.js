@@ -14,6 +14,47 @@ const INITIAL_ASIN_DATA = [
 ];
 
 const API_BASE_URL = '';
+  {
+    asin: 'B0A7TUV901',
+    partNumber: 'PN-1911-Q',
+    supplier: 'Everline Consumer',
+    seniorDirector: 'Marcus Lee',
+    channel: 'Amazon Business',
+    overrideLock: true,
+    minRoas: 3.4,
+    tacosCeiling: 14,
+    budgetApplicable: true,
+    dailyBudget: 200,
+  },
+  {
+    asin: 'B078XYZ778',
+    partNumber: 'PN-0208-X',
+    supplier: 'Northstar Brands',
+    seniorDirector: 'Ariana Gomez',
+    channel: 'Amazon Fresh',
+    overrideLock: false,
+    minRoas: 2.1,
+    tacosCeiling: 22,
+    budgetApplicable: false,
+    dailyBudget: 0,
+  },
+  {
+    asin: 'B0C5LMN452',
+    partNumber: 'PN-8890-K',
+    supplier: 'Ridgeway Supply Co.',
+    seniorDirector: 'Priya Patel',
+    channel: 'Amazon Global',
+    overrideLock: true,
+    minRoas: 4.2,
+    tacosCeiling: 12.5,
+    budgetApplicable: true,
+    dailyBudget: 80,
+  },
+];
+
+const API_BASE_URL = ''; // keep empty when the backend runs on the same host/port.
+const STORAGE_KEY = 'amazon-ad-asin-overrides';
+const SUPPLIER_API_URL = ''; // Example: 'http://localhost:3000/api/suppliers'
 
 const supplierFilter = document.querySelector('#supplierFilter');
 const directorFilter = document.querySelector('#directorFilter');
@@ -27,6 +68,7 @@ const status = document.querySelector('#status');
 const rowTemplate = document.querySelector('#asinRowTemplate');
 
 let asinData = structuredClone(INITIAL_ASIN_DATA);
+let asinData = loadState();
 let supplierOptions = [];
 
 init();
@@ -46,6 +88,10 @@ async function init() {
 }
 
 function wireEvents() {
+  supplierOptions = await loadSupplierOptions();
+  hydrateFilters();
+  renderTable();
+
   supplierFilter.addEventListener('change', renderTable);
   directorFilter.addEventListener('change', renderTable);
   channelFilter.addEventListener('change', renderTable);
@@ -116,6 +162,20 @@ async function loadAsinOverrides() {
     return data;
   } catch (error) {
     status.textContent = `Using local sample data because API load failed (${error.message}).`;
+  saveAllButton.addEventListener('click', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(asinData));
+    status.textContent = `Saved ${asinData.length} ASIN requirement record(s).`;
+    setTimeout(() => {
+      status.textContent = '';
+    }, 2500);
+  });
+}
+
+function loadState() {
+  try {
+    const persisted = localStorage.getItem(STORAGE_KEY);
+    return persisted ? JSON.parse(persisted) : structuredClone(INITIAL_ASIN_DATA);
+  } catch {
     return structuredClone(INITIAL_ASIN_DATA);
   }
 }
@@ -177,6 +237,36 @@ async function loadSupplierOptions() {
 
     return suppliers.filter(Boolean).sort();
   } catch {
+async function loadSupplierOptions() {
+  if (!SUPPLIER_API_URL) {
+    return [...new Set(asinData.map((row) => row.supplier))].sort();
+  }
+
+  try {
+    const response = await fetch(SUPPLIER_API_URL);
+    if (!response.ok) {
+      throw new Error(`Supplier API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    const suppliers = Array.isArray(data)
+      ? data
+      : Array.isArray(data.suppliers)
+      ? data.suppliers
+      : [];
+
+    return suppliers
+      .map((supplier) => {
+        if (typeof supplier === 'string') {
+          return supplier;
+        }
+
+        return supplier?.name || '';
+      })
+      .filter(Boolean)
+      .sort();
+  } catch (error) {
+    status.textContent = `Could not load suppliers from API (${error.message}). Using local list.`;
     return [...new Set(asinData.map((row) => row.supplier))].sort();
   }
 }
