@@ -32,7 +32,6 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  flex-wrap: wrap;
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
@@ -70,7 +69,6 @@ code {
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .secondary-btn {
@@ -196,19 +194,4 @@ tr:last-child td {
 
 tr.dimmed {
   opacity: 0.5;
-}
-
-
-.meta-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.build-info {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.8rem;
 }

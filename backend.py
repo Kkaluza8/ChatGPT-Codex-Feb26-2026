@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import sqlite3
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -10,7 +11,6 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / 'advertising.db'
 HOST = '0.0.0.0'
 PORT = 4173
-APP_VERSION = '2026-02-28.6'
 
 INITIAL_ASIN_DATA = [
     {
@@ -109,6 +109,33 @@ def seed_defaults(force=False):
             seeded_count = len(INITIAL_ASIN_DATA)
 
     return seeded_count
+    conn = get_connection()
+    existing_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
+
+    should_seed = force or existing_count == 0
+
+    if force:
+        conn.execute('DELETE FROM asin_overrides')
+
+    if should_seed:
+      conn = get_connection()
+      existing_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
+
+    if force:
+        conn.execute('DELETE FROM asin_overrides')
+
+    if force or existing_count == 0:
+
+      row_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
+    if row_count == 0:
+        for row in INITIAL_ASIN_DATA:
+            upsert_record(conn, row)
+
+    conn.commit()
+    conn.close()
+
+    return len(INITIAL_ASIN_DATA) if should_seed else 0
+    return len(INITIAL_ASIN_DATA) if force or existing_count == 0 else 0
 
 
 def normalize_record(record):
@@ -210,14 +237,6 @@ def fetch_records():
     return records
 
 
-
-
-def get_health_payload():
-    conn = get_connection()
-    count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
-    conn.close()
-    return {'status': 'ok', 'version': APP_VERSION, 'rowCount': int(count)}
-
 def fetch_suppliers():
     conn = get_connection()
     rows = conn.execute('SELECT DISTINCT supplier FROM asin_overrides ORDER BY supplier').fetchall()
@@ -229,12 +248,6 @@ class APIHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(BASE_DIR), **kwargs)
 
-    def end_headers(self):
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-        self.send_header('Pragma', 'no-cache')
-        self.send_header('Expires', '0')
-        super().end_headers()
-
     def do_GET(self):
         parsed = urlparse(self.path)
 
@@ -244,10 +257,6 @@ class APIHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == '/api/suppliers':
             self.respond_json(fetch_suppliers())
-            return
-
-        if parsed.path == '/api/health':
-            self.respond_json(get_health_payload())
             return
 
         if parsed.path == '/':

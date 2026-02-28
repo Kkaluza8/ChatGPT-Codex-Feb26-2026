@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Cache-Control" content="no-store" />
     <title>Amazon Advertising ASIN Controls</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -22,11 +21,17 @@
           </p>
         </div>
         <div class="header-actions">
-          <button id="reloadData" class="secondary-btn">Reload Data</button>
           <button id="addAsin" class="secondary-btn">Create ASIN</button>
           <button id="seedDefaults" class="secondary-btn">Load Default Data</button>
           <button id="saveAll" class="primary-btn">Save Changes</button>
         </div>
+            Data now loads/saves through the backend database API. Start with
+            <code>python backend.py</code> and then open this page.
+            Tip: set <code>SUPPLIER_API_URL</code> in <code>app.js</code> to load suppliers from your
+            supplier database API.
+          </p>
+        </div>
+        <button id="saveAll" class="primary-btn">Save Changes</button>
       </header>
 
       <section class="filters">
@@ -77,7 +82,7 @@
         </table>
       </section>
 
-      <div class="meta-row"><p id="status" class="status" role="status"></p><p id="buildInfo" class="build-info"></p></div>
+      <p id="status" class="status" role="status"></p>
     </main>
 
     <template id="asinRowTemplate">
