@@ -38,11 +38,3 @@ python backend.py
 ```
 
 If `py_compile` fails, do not keep editing indentation manually; replace the file from the latest repo snapshot.
-
-
-## Loading backend data into the UI
-1. Start backend: `python backend.py`
-2. Open `http://127.0.0.1:4173`
-3. Click **Reload Data** to pull latest rows from SQLite.
-4. If DB is empty, click **Load Default Data** once.
-5. Click **Save Changes** after edits, including newly created ASIN rows.

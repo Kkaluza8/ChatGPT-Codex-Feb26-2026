@@ -21,11 +21,17 @@
           </p>
         </div>
         <div class="header-actions">
-          <button id="reloadData" class="secondary-btn">Reload Data</button>
           <button id="addAsin" class="secondary-btn">Create ASIN</button>
           <button id="seedDefaults" class="secondary-btn">Load Default Data</button>
           <button id="saveAll" class="primary-btn">Save Changes</button>
         </div>
+            Data now loads/saves through the backend database API. Start with
+            <code>python backend.py</code> and then open this page.
+            Tip: set <code>SUPPLIER_API_URL</code> in <code>app.js</code> to load suppliers from your
+            supplier database API.
+          </p>
+        </div>
+        <button id="saveAll" class="primary-btn">Save Changes</button>
       </header>
 
       <section class="filters">
