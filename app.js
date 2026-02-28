@@ -49,6 +49,7 @@ const INITIAL_ASIN_DATA = [
   },
 ];
 
+const API_BASE_URL = ''; // keep empty when the backend runs on the same host/port.
 const STORAGE_KEY = 'amazon-ad-asin-overrides';
 const SUPPLIER_API_URL = ''; // Example: 'http://localhost:3000/api/suppliers'
 
@@ -61,12 +62,14 @@ const saveAllButton = document.querySelector('#saveAll');
 const status = document.querySelector('#status');
 const rowTemplate = document.querySelector('#asinRowTemplate');
 
+let asinData = structuredClone(INITIAL_ASIN_DATA);
 let asinData = loadState();
 let supplierOptions = [];
 
 init();
 
 async function init() {
+  asinData = await loadAsinOverrides();
   supplierOptions = await loadSupplierOptions();
   hydrateFilters();
   renderTable();
@@ -76,6 +79,37 @@ async function init() {
   channelFilter.addEventListener('change', renderTable);
   asinSearch.addEventListener('input', renderTable);
 
+  saveAllButton.addEventListener('click', async () => {
+    saveAllButton.disabled = true;
+    try {
+      await saveAsinOverrides(asinData);
+      status.textContent = `Saved ${asinData.length} ASIN record(s) to the database.`;
+    } catch (error) {
+      status.textContent = `Save failed (${error.message}).`;
+    } finally {
+      saveAllButton.disabled = false;
+      setTimeout(() => {
+        status.textContent = '';
+      }, 3000);
+    }
+  });
+}
+
+async function loadAsinOverrides() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/asin-overrides`);
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid response shape');
+    }
+
+    return data;
+  } catch (error) {
+    status.textContent = `Using local sample data because API load failed (${error.message}).`;
   saveAllButton.addEventListener('click', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(asinData));
     status.textContent = `Saved ${asinData.length} ASIN requirement record(s).`;
@@ -94,6 +128,42 @@ function loadState() {
   }
 }
 
+async function saveAsinOverrides(records) {
+  const response = await fetch(`${API_BASE_URL}/api/asin-overrides`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ records }),
+  });
+
+  if (!response.ok) {
+    let message = `API returned ${response.status}`;
+    try {
+      const payload = await response.json();
+      message = payload.error || message;
+    } catch {
+      // ignore parse issues
+    }
+
+    throw new Error(message);
+  }
+}
+
+async function loadSupplierOptions() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/suppliers`);
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const suppliers = await response.json();
+    if (!Array.isArray(suppliers)) {
+      throw new Error('Invalid suppliers response');
+    }
+
+    return suppliers.filter(Boolean).sort();
+  } catch {
 async function loadSupplierOptions() {
   if (!SUPPLIER_API_URL) {
     return [...new Set(asinData.map((row) => row.supplier))].sort();
@@ -131,6 +201,10 @@ async function loadSupplierOptions() {
 function hydrateFilters() {
   const directors = [...new Set(asinData.map((row) => row.seniorDirector))].sort();
   const channels = [...new Set(asinData.map((row) => row.channel))].sort();
+
+  supplierFilter.length = 1;
+  directorFilter.length = 1;
+  channelFilter.length = 1;
 
   supplierOptions.forEach((supplier) => {
     supplierFilter.add(new Option(supplier, supplier));
