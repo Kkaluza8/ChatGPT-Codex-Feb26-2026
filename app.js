@@ -1,3 +1,5 @@
+const APP_VERSION = '2026-02-28.6';
+
 const INITIAL_ASIN_DATA = [
   {
     asin: 'B09ABC1234',
@@ -14,47 +16,6 @@ const INITIAL_ASIN_DATA = [
 ];
 
 const API_BASE_URL = '';
-  {
-    asin: 'B0A7TUV901',
-    partNumber: 'PN-1911-Q',
-    supplier: 'Everline Consumer',
-    seniorDirector: 'Marcus Lee',
-    channel: 'Amazon Business',
-    overrideLock: true,
-    minRoas: 3.4,
-    tacosCeiling: 14,
-    budgetApplicable: true,
-    dailyBudget: 200,
-  },
-  {
-    asin: 'B078XYZ778',
-    partNumber: 'PN-0208-X',
-    supplier: 'Northstar Brands',
-    seniorDirector: 'Ariana Gomez',
-    channel: 'Amazon Fresh',
-    overrideLock: false,
-    minRoas: 2.1,
-    tacosCeiling: 22,
-    budgetApplicable: false,
-    dailyBudget: 0,
-  },
-  {
-    asin: 'B0C5LMN452',
-    partNumber: 'PN-8890-K',
-    supplier: 'Ridgeway Supply Co.',
-    seniorDirector: 'Priya Patel',
-    channel: 'Amazon Global',
-    overrideLock: true,
-    minRoas: 4.2,
-    tacosCeiling: 12.5,
-    budgetApplicable: true,
-    dailyBudget: 80,
-  },
-];
-
-const API_BASE_URL = ''; // keep empty when the backend runs on the same host/port.
-const STORAGE_KEY = 'amazon-ad-asin-overrides';
-const SUPPLIER_API_URL = ''; // Example: 'http://localhost:3000/api/suppliers'
 
 const supplierFilter = document.querySelector('#supplierFilter');
 const directorFilter = document.querySelector('#directorFilter');
@@ -62,40 +23,52 @@ const channelFilter = document.querySelector('#channelFilter');
 const asinSearch = document.querySelector('#asinSearch');
 const asinTableBody = document.querySelector('#asinTableBody');
 const saveAllButton = document.querySelector('#saveAll');
+const reloadDataButton = document.querySelector('#reloadData');
 const addAsinButton = document.querySelector('#addAsin');
 const seedDefaultsButton = document.querySelector('#seedDefaults');
 const status = document.querySelector('#status');
+const buildInfo = document.querySelector('#buildInfo');
 const rowTemplate = document.querySelector('#asinRowTemplate');
 
 let asinData = structuredClone(INITIAL_ASIN_DATA);
-let asinData = loadState();
 let supplierOptions = [];
 
 init();
 
 async function init() {
-  asinData = await loadAsinOverrides();
-
-  if (!asinData.length) {
-    await seedDefaults();
-    asinData = await loadAsinOverrides();
+  if (buildInfo) {
+    buildInfo.textContent = `UI build ${APP_VERSION}`;
   }
 
-  supplierOptions = await loadSupplierOptions();
-  hydrateFilters();
-  renderTable();
+  await refreshData({ preserveFilters: false, silent: true });
+
+  if (!asinData.length) {
+    await seedDefaults(false);
+    await refreshData({ preserveFilters: false, silent: true });
+  }
+
   wireEvents();
 }
 
 function wireEvents() {
-  supplierOptions = await loadSupplierOptions();
-  hydrateFilters();
-  renderTable();
-
   supplierFilter.addEventListener('change', renderTable);
   directorFilter.addEventListener('change', renderTable);
   channelFilter.addEventListener('change', renderTable);
   asinSearch.addEventListener('input', renderTable);
+
+  if (reloadDataButton) {
+    reloadDataButton.addEventListener('click', async () => {
+      await withBusy(reloadDataButton, async () => {
+        await refreshData();
+        setStatus('Reloaded ASIN data from backend database.');
+      });
+    });
+  }
+
+  if (!addAsinButton || !seedDefaultsButton || !saveAllButton) {
+    setStatus('UI is missing required buttons due to a merge conflict. Replace with latest files.');
+    return;
+  }
 
   addAsinButton.addEventListener('click', () => {
     const newAsin = {
@@ -113,69 +86,80 @@ function wireEvents() {
 
     asinData.unshift(newAsin);
     supplierOptions = [...new Set([...supplierOptions, newAsin.supplier])].sort();
+    resetFilters();
     hydrateFilters();
     renderTable();
-    status.textContent = `Created ${newAsin.asin}. Click Save Changes to persist.`;
+    setStatus(`Created ${newAsin.asin}. Click Save Changes to persist.`);
   });
 
   seedDefaultsButton.addEventListener('click', async () => {
-    seedDefaultsButton.disabled = true;
-    try {
+    await withBusy(seedDefaultsButton, async () => {
       await seedDefaults(true);
-      asinData = await loadAsinOverrides();
-      supplierOptions = await loadSupplierOptions();
-      hydrateFilters();
-      renderTable();
-    } finally {
-      seedDefaultsButton.disabled = false;
-    }
+      await refreshData({ preserveFilters: false, silent: true });
+      setStatus('Loaded default ASIN data from backend.');
+    });
   });
 
   saveAllButton.addEventListener('click', async () => {
-    saveAllButton.disabled = true;
-    try {
+    await withBusy(saveAllButton, async () => {
       await saveAsinOverrides(asinData);
-      status.textContent = `Saved ${asinData.length} ASIN record(s) to the database.`;
-    } catch (error) {
-      status.textContent = `Save failed (${error.message}).`;
-    } finally {
-      saveAllButton.disabled = false;
-      setTimeout(() => {
-        status.textContent = '';
-      }, 3000);
-    }
+      setStatus(`Saved ${asinData.length} ASIN record(s) to the database.`);
+    });
   });
+}
+
+async function withBusy(button, action) {
+  button.disabled = true;
+  try {
+    await action();
+  } catch (error) {
+    setStatus(error.message || 'Unexpected error while processing request.');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function setStatus(message) {
+  status.textContent = message;
+}
+
+async function refreshData({ preserveFilters = false, silent = false } = {}) {
+  if (!preserveFilters) {
+    resetFilters();
+  }
+
+  asinData = await loadAsinOverrides();
+  supplierOptions = await loadSupplierOptions();
+  hydrateFilters();
+  renderTable();
+
+  if (!silent && !asinData.length) {
+    setStatus('No ASIN rows found in database. Click Load Default Data to seed starter rows.');
+  }
+}
+
+function resetFilters() {
+  supplierFilter.value = 'all';
+  directorFilter.value = 'all';
+  channelFilter.value = 'all';
+  asinSearch.value = '';
 }
 
 async function loadAsinOverrides() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/asin-overrides`);
+    const response = await fetch(`${API_BASE_URL}/api/asin-overrides`, { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
+      throw new Error(`Could not load ASIN data (HTTP ${response.status}).`);
     }
 
     const data = await response.json();
     if (!Array.isArray(data)) {
-      throw new Error('Invalid response shape');
+      throw new Error('Invalid ASIN response shape from backend.');
     }
 
     return data;
   } catch (error) {
-    status.textContent = `Using local sample data because API load failed (${error.message}).`;
-  saveAllButton.addEventListener('click', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(asinData));
-    status.textContent = `Saved ${asinData.length} ASIN requirement record(s).`;
-    setTimeout(() => {
-      status.textContent = '';
-    }, 2500);
-  });
-}
-
-function loadState() {
-  try {
-    const persisted = localStorage.getItem(STORAGE_KEY);
-    return persisted ? JSON.parse(persisted) : structuredClone(INITIAL_ASIN_DATA);
-  } catch {
+    setStatus(`Using local sample data because backend load failed: ${error.message}`);
     return structuredClone(INITIAL_ASIN_DATA);
   }
 }
@@ -190,7 +174,7 @@ async function saveAsinOverrides(records) {
   });
 
   if (!response.ok) {
-    let message = `API returned ${response.status}`;
+    let message = `Save failed (HTTP ${response.status}).`;
     try {
       const payload = await response.json();
       message = payload.error || message;
@@ -203,70 +187,33 @@ async function saveAsinOverrides(records) {
 }
 
 async function seedDefaults(force = false) {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/seed-defaults`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ force }),
-    });
+  const response = await fetch(`${API_BASE_URL}/api/seed-defaults`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ force }),
+  });
 
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
-    }
-
-    const payload = await response.json();
-    status.textContent = `Loaded ${payload.seeded || 0} default ASIN record(s).`;
-  } catch (error) {
-    status.textContent = `Default data load failed (${error.message}).`;
+  if (!response.ok) {
+    throw new Error(`Default data load failed (HTTP ${response.status}).`);
   }
 }
 
 async function loadSupplierOptions() {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/suppliers`);
+    const response = await fetch(`${API_BASE_URL}/api/suppliers`, { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
+      throw new Error(`Could not load suppliers (HTTP ${response.status}).`);
     }
 
     const suppliers = await response.json();
     if (!Array.isArray(suppliers)) {
-      throw new Error('Invalid suppliers response');
+      throw new Error('Invalid suppliers response shape.');
     }
 
     return suppliers.filter(Boolean).sort();
   } catch {
-async function loadSupplierOptions() {
-  if (!SUPPLIER_API_URL) {
-    return [...new Set(asinData.map((row) => row.supplier))].sort();
-  }
-
-  try {
-    const response = await fetch(SUPPLIER_API_URL);
-    if (!response.ok) {
-      throw new Error(`Supplier API returned ${response.status}`);
-    }
-
-    const data = await response.json();
-    const suppliers = Array.isArray(data)
-      ? data
-      : Array.isArray(data.suppliers)
-      ? data.suppliers
-      : [];
-
-    return suppliers
-      .map((supplier) => {
-        if (typeof supplier === 'string') {
-          return supplier;
-        }
-
-        return supplier?.name || '';
-      })
-      .filter(Boolean)
-      .sort();
-  } catch (error) {
-    status.textContent = `Could not load suppliers from API (${error.message}). Using local list.`;
     return [...new Set(asinData.map((row) => row.supplier))].sort();
   }
 }
@@ -279,17 +226,9 @@ function hydrateFilters() {
   directorFilter.length = 1;
   channelFilter.length = 1;
 
-  supplierOptions.forEach((supplier) => {
-    supplierFilter.add(new Option(supplier, supplier));
-  });
-
-  directors.forEach((director) => {
-    directorFilter.add(new Option(director, director));
-  });
-
-  channels.forEach((channel) => {
-    channelFilter.add(new Option(channel, channel));
-  });
+  supplierOptions.forEach((supplier) => supplierFilter.add(new Option(supplier, supplier)));
+  directors.forEach((director) => directorFilter.add(new Option(director, director)));
+  channels.forEach((channel) => channelFilter.add(new Option(channel, channel)));
 }
 
 function renderTable() {
@@ -303,7 +242,6 @@ function renderTable() {
     const directorMatches = director === 'all' || row.seniorDirector === director;
     const channelMatches = channel === 'all' || row.channel === channel;
     const asinMatches = !search || row.asin.toLowerCase().includes(search);
-
     return supplierMatches && directorMatches && channelMatches && asinMatches;
   });
 
@@ -335,25 +273,11 @@ function renderTable() {
     dailyBudgetInput.value = row.dailyBudget;
     dailyBudgetInput.disabled = !row.budgetApplicable;
 
-    supplierSelect.addEventListener('change', () => {
-      row.supplier = supplierSelect.value;
-    });
-
-    channelSelect.addEventListener('change', () => {
-      row.channel = channelSelect.value;
-    });
-
-    overrideLockInput.addEventListener('change', () => {
-      row.overrideLock = overrideLockInput.checked;
-    });
-
-    minRoasInput.addEventListener('change', () => {
-      row.minRoas = Number(minRoasInput.value) || 0;
-    });
-
-    tacosCeilingInput.addEventListener('change', () => {
-      row.tacosCeiling = Number(tacosCeilingInput.value) || 0;
-    });
+    supplierSelect.addEventListener('change', () => (row.supplier = supplierSelect.value));
+    channelSelect.addEventListener('change', () => (row.channel = channelSelect.value));
+    overrideLockInput.addEventListener('change', () => (row.overrideLock = overrideLockInput.checked));
+    minRoasInput.addEventListener('change', () => (row.minRoas = Number(minRoasInput.value) || 0));
+    tacosCeilingInput.addEventListener('change', () => (row.tacosCeiling = Number(tacosCeilingInput.value) || 0));
 
     budgetApplicableInput.addEventListener('change', () => {
       row.budgetApplicable = budgetApplicableInput.checked;
@@ -365,9 +289,7 @@ function renderTable() {
       }
     });
 
-    dailyBudgetInput.addEventListener('change', () => {
-      row.dailyBudget = Number(dailyBudgetInput.value) || 0;
-    });
+    dailyBudgetInput.addEventListener('change', () => (row.dailyBudget = Number(dailyBudgetInput.value) || 0));
 
     tr.classList.toggle('dimmed', !row.budgetApplicable);
     asinTableBody.append(tr);
@@ -382,10 +304,6 @@ function renderTable() {
 
 function hydrateSupplierSelect(selectElement, selectedSupplier) {
   const options = [...new Set([...supplierOptions, selectedSupplier])].sort();
-
   selectElement.replaceChildren();
-  options.forEach((supplier) => {
-    const option = new Option(supplier, supplier, false, supplier === selectedSupplier);
-    selectElement.add(option);
-  });
+  options.forEach((supplier) => selectElement.add(new Option(supplier, supplier, false, supplier === selectedSupplier)));
 }
