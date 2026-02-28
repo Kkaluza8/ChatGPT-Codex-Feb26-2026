@@ -94,6 +94,21 @@ def initialize_database():
 
 def seed_defaults(force=False):
     """Seed starter rows when empty, or reset when force=True."""
+    seeded_count = 0
+
+    with get_connection() as conn:
+        count_row = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()
+        existing_count = int(count_row['count']) if count_row else 0
+
+        if force:
+            conn.execute('DELETE FROM asin_overrides')
+
+        if force or existing_count == 0:
+            for row in INITIAL_ASIN_DATA:
+                upsert_record(conn, row)
+            seeded_count = len(INITIAL_ASIN_DATA)
+
+    return seeded_count
     conn = get_connection()
     existing_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
 
