@@ -11,6 +11,9 @@ const INITIAL_ASIN_DATA = [
     budgetApplicable: true,
     dailyBudget: 120,
   },
+];
+
+const API_BASE_URL = '';
   {
     asin: 'B0A7TUV901',
     partNumber: 'PN-1911-Q',
@@ -59,6 +62,8 @@ const channelFilter = document.querySelector('#channelFilter');
 const asinSearch = document.querySelector('#asinSearch');
 const asinTableBody = document.querySelector('#asinTableBody');
 const saveAllButton = document.querySelector('#saveAll');
+const addAsinButton = document.querySelector('#addAsin');
+const seedDefaultsButton = document.querySelector('#seedDefaults');
 const status = document.querySelector('#status');
 const rowTemplate = document.querySelector('#asinRowTemplate');
 
@@ -70,6 +75,19 @@ init();
 
 async function init() {
   asinData = await loadAsinOverrides();
+
+  if (!asinData.length) {
+    await seedDefaults();
+    asinData = await loadAsinOverrides();
+  }
+
+  supplierOptions = await loadSupplierOptions();
+  hydrateFilters();
+  renderTable();
+  wireEvents();
+}
+
+function wireEvents() {
   supplierOptions = await loadSupplierOptions();
   hydrateFilters();
   renderTable();
@@ -78,6 +96,40 @@ async function init() {
   directorFilter.addEventListener('change', renderTable);
   channelFilter.addEventListener('change', renderTable);
   asinSearch.addEventListener('input', renderTable);
+
+  addAsinButton.addEventListener('click', () => {
+    const newAsin = {
+      asin: `NEW-${Date.now().toString().slice(-6)}`,
+      partNumber: 'NEW-PART',
+      supplier: supplierOptions[0] || 'Unassigned Supplier',
+      seniorDirector: 'Unassigned Director',
+      channel: 'Amazon.com',
+      overrideLock: false,
+      minRoas: 0,
+      tacosCeiling: 0,
+      budgetApplicable: false,
+      dailyBudget: 0,
+    };
+
+    asinData.unshift(newAsin);
+    supplierOptions = [...new Set([...supplierOptions, newAsin.supplier])].sort();
+    hydrateFilters();
+    renderTable();
+    status.textContent = `Created ${newAsin.asin}. Click Save Changes to persist.`;
+  });
+
+  seedDefaultsButton.addEventListener('click', async () => {
+    seedDefaultsButton.disabled = true;
+    try {
+      await seedDefaults(true);
+      asinData = await loadAsinOverrides();
+      supplierOptions = await loadSupplierOptions();
+      hydrateFilters();
+      renderTable();
+    } finally {
+      seedDefaultsButton.disabled = false;
+    }
+  });
 
   saveAllButton.addEventListener('click', async () => {
     saveAllButton.disabled = true;
@@ -147,6 +199,27 @@ async function saveAsinOverrides(records) {
     }
 
     throw new Error(message);
+  }
+}
+
+async function seedDefaults(force = false) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/seed-defaults`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ force }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    status.textContent = `Loaded ${payload.seeded || 0} default ASIN record(s).`;
+  } catch (error) {
+    status.textContent = `Default data load failed (${error.message}).`;
   }
 }
 

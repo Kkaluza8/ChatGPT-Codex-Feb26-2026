@@ -88,6 +88,18 @@ def initialize_database():
         )
         '''
     )
+    conn.commit()
+    conn.close()
+
+
+def seed_defaults(force=False):
+    conn = get_connection()
+    existing_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
+
+    if force:
+        conn.execute('DELETE FROM asin_overrides')
+
+    if force or existing_count == 0:
 
     row_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
     if row_count == 0:
@@ -96,6 +108,8 @@ def initialize_database():
 
     conn.commit()
     conn.close()
+
+    return len(INITIAL_ASIN_DATA) if force or existing_count == 0 else 0
 
 
 def normalize_record(record):
@@ -224,6 +238,23 @@ class APIHandler(SimpleHTTPRequestHandler):
 
         return super().do_GET()
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path != '/api/seed-defaults':
+            self.respond_error(HTTPStatus.NOT_FOUND, 'Endpoint not found')
+            return
+
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            payload = self.rfile.read(content_length) if content_length else b'{}'
+            decoded = json.loads(payload.decode('utf-8') or '{}')
+            force = bool(decoded.get('force', False)) if isinstance(decoded, dict) else False
+
+            seeded_count = seed_defaults(force=force)
+            self.respond_json({'seeded': seeded_count})
+        except (json.JSONDecodeError, ValueError) as error:
+            self.respond_error(HTTPStatus.BAD_REQUEST, str(error))
+
     def do_PUT(self):
         parsed = urlparse(self.path)
         if parsed.path != '/api/asin-overrides':
@@ -263,6 +294,7 @@ class APIHandler(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     initialize_database()
+    seed_defaults(force=False)
     server = ThreadingHTTPServer((HOST, PORT), APIHandler)
     print(f'Serving app + API on http://{HOST}:{PORT}')
     print(f'Database file: {DB_PATH}')

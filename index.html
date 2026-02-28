@@ -16,6 +16,15 @@
             Manage override lock, minimum ROAS, TACoS ceiling, and optional daily budget by ASIN.
           </p>
           <p class="subtitle small">
+            Data loads/saves through the backend database API. Start with
+            <code>python backend.py</code>, then open this page.
+          </p>
+        </div>
+        <div class="header-actions">
+          <button id="addAsin" class="secondary-btn">Create ASIN</button>
+          <button id="seedDefaults" class="secondary-btn">Load Default Data</button>
+          <button id="saveAll" class="primary-btn">Save Changes</button>
+        </div>
             Data now loads/saves through the backend database API. Start with
             <code>python backend.py</code> and then open this page.
             Tip: set <code>SUPPLIER_API_URL</code> in <code>app.js</code> to load suppliers from your
