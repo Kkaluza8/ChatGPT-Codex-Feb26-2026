@@ -1,22 +1,5 @@
 # Amazon Advertising ASIN Overrides (Local)
 
-## Quick clarity: `not a git repository` on Windows
-If you downloaded the project using **Download ZIP** from GitHub, your folder will not contain the `.git` directory. In that case, this message is expected:
-
-`fatal: not a git repository (or any of the parent directories): .git`
-
-You can still run the app normally with `python backend.py`; you just cannot run Git commands (`git status`, `git remote -v`, etc.) inside a ZIP download.
-
-If you want a folder that supports Git commands and branches, clone instead of ZIP:
-
-```bat
-cd /d C:\Users\<you>\Downloads
-git clone <your-github-repo-url>
-cd ChatGPT-Codex-Feb26-2026
-```
-
-Then `git status` and `git remote -v` will work.
-
 ## Run locally (Windows CMD)
 ```bat
 cd /d C:\Users\<you>\Downloads\ChatGPT-Codex-Feb26-2026-main\ChatGPT-Codex-Feb26-2026-main
