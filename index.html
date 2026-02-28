@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Amazon Advertising ASIN Controls</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Amazon Advertising</p>
+          <h1>ASIN Requirement Overrides</h1>
+          <p class="subtitle">
+            Manage override lock, minimum ROAS, TACoS ceiling, and optional daily budget by ASIN.
+          </p>
+          <p class="subtitle small">
+            Tip: set <code>SUPPLIER_API_URL</code> in <code>app.js</code> to load suppliers from your
+            supplier database API.
+          </p>
+        </div>
+        <button id="saveAll" class="primary-btn">Save Changes</button>
+      </header>
+
+      <section class="filters">
+        <label>
+          Supplier
+          <select id="supplierFilter">
+            <option value="all">All suppliers</option>
+          </select>
+        </label>
+
+        <label>
+          Senior Director of Advertising
+          <select id="directorFilter">
+            <option value="all">All senior directors</option>
+          </select>
+        </label>
+
+        <label>
+          Amazon Channel
+          <select id="channelFilter">
+            <option value="all">All channels</option>
+          </select>
+        </label>
+
+        <label>
+          Search ASIN
+          <input id="asinSearch" type="search" placeholder="Type an ASIN" />
+        </label>
+      </section>
+
+      <section class="table-wrap" aria-live="polite">
+        <table>
+          <thead>
+            <tr>
+              <th>ASIN</th>
+              <th>Part Number</th>
+              <th>Supplier</th>
+              <th>Senior Director</th>
+              <th>Amazon Channel</th>
+              <th>Override Lock</th>
+              <th>Min ROAS</th>
+              <th>TACoS Ceiling (%)</th>
+              <th>Budget Applicable</th>
+              <th>Daily Budget ($)</th>
+            </tr>
+          </thead>
+          <tbody id="asinTableBody"></tbody>
+        </table>
+      </section>
+
+      <p id="status" class="status" role="status"></p>
+    </main>
+
+    <template id="asinRowTemplate">
+      <tr>
+        <td class="asin"></td>
+        <td class="part-number"></td>
+        <td>
+          <select class="supplier-select"></select>
+        </td>
+        <td class="director"></td>
+        <td>
+          <select class="channel-select">
+            <option value="Amazon.com">Amazon.com</option>
+            <option value="Amazon Fresh">Amazon Fresh</option>
+            <option value="Amazon Business">Amazon Business</option>
+            <option value="Amazon Global">Amazon Global</option>
+          </select>
+        </td>
+        <td>
+          <label class="switch" aria-label="Override lock">
+            <input class="override-lock" type="checkbox" />
+            <span class="slider"></span>
+          </label>
+        </td>
+        <td>
+          <input class="min-roas" type="number" min="0" step="0.1" />
+        </td>
+        <td>
+          <input class="tacos-ceiling" type="number" min="0" max="100" step="0.1" />
+        </td>
+        <td>
+          <input class="budget-applicable" type="checkbox" />
+        </td>
+        <td>
+          <input class="daily-budget" type="number" min="0" step="1" />
+        </td>
+      </tr>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
