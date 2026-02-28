@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import sqlite3
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -102,6 +103,16 @@ def seed_defaults(force=False):
         conn.execute('DELETE FROM asin_overrides')
 
     if should_seed:
+    conn = get_connection()
+    existing_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
+
+    if force:
+        conn.execute('DELETE FROM asin_overrides')
+
+    if force or existing_count == 0:
+
+    row_count = conn.execute('SELECT COUNT(*) AS count FROM asin_overrides').fetchone()['count']
+    if row_count == 0:
         for row in INITIAL_ASIN_DATA:
             upsert_record(conn, row)
 
@@ -109,6 +120,7 @@ def seed_defaults(force=False):
     conn.close()
 
     return len(INITIAL_ASIN_DATA) if should_seed else 0
+    return len(INITIAL_ASIN_DATA) if force or existing_count == 0 else 0
 
 
 def normalize_record(record):
